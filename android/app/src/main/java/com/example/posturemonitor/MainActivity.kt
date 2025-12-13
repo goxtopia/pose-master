@@ -591,7 +591,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun updateMonitorState(landmarks: List<Point3D>?, physicalMotion: Boolean) {
-        val state = monitor.process(landmarks, physicalMotion)
+        // User is present if landmarks is not null/empty
+        val userPresent = landmarks != null && landmarks.isNotEmpty()
+        val state = monitor.process(landmarks, physicalMotion, userPresent)
 
         timerJoints.text = getString(R.string.timer_joints, state.timers["joints"])
         timerBody.text = getString(R.string.timer_body, state.timers["body"])
