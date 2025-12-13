@@ -36,7 +36,9 @@ class OverlayView(context: Context, attrs: AttributeSet?) : View(context, attrs)
     private val bodyConnections = listOf(
         Pair(11, 12), Pair(11, 23), Pair(12, 24), Pair(23, 24),
         Pair(11, 13), Pair(13, 15), Pair(12, 14), Pair(14, 16),
-        Pair(23, 25), Pair(25, 27), Pair(24, 26), Pair(26, 28)
+        Pair(23, 25), Pair(25, 27), Pair(24, 26), Pair(26, 28),
+        // Head connections (Nose to Shoulders) for stickman style
+        Pair(0, 11), Pair(0, 12)
     )
 
     fun setLandmarks(newLandmarks: List<Point3D>?) {
@@ -52,6 +54,12 @@ class OverlayView(context: Context, attrs: AttributeSet?) : View(context, attrs)
         for (conn in bodyConnections) {
             val idx1 = conn.first
             val idx2 = conn.second
+
+            // If showing face points is disabled, skip connections involving head (index 0)
+            if (!showFacePoints && (idx1 == 0 || idx2 == 0)) {
+                continue
+            }
+
             if (idx1 < list.size && idx2 < list.size) {
                 val p1 = list[idx1]
                 val p2 = list[idx2]
