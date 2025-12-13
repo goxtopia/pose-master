@@ -3,45 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Posture & Gaze Monitor (ARM64 Optimized)</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- MediaPipe Pose (Local) -->
+    <title>Posture & Gaze Monitor</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- MediaPipe -->
     <script src="libs/pose.js"></script>
     <script src="libs/camera_utils.js"></script>
     <script src="libs/drawing_utils.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; }
+        /* Ensure video and canvas overlap perfectly */
+        .video-container { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 1rem; }
+        .input_video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); /* Mirror for user */ }
+        .output_canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        /* Glassmorphism utilities */
+        .glass {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Posture Monitor</h1>
-        <div class="video-wrapper">
+<body class="h-screen w-screen overflow-hidden text-white flex flex-col items-center justify-center p-4">
+
+    <!-- Main Container -->
+    <div class="relative w-full h-full max-w-6xl flex flex-col md:flex-row gap-4">
+
+        <!-- Video Feed Area -->
+        <div class="relative flex-1 video-container shadow-2xl ring-1 ring-white/10">
             <video class="input_video" autoplay playsinline></video>
             <canvas class="output_canvas"></canvas>
-            <div id="alert-overlay" class="hidden">⚠️ MOVE! ⚠️</div>
-        </div>
-        
-        <div class="controls">
-            <div class="status-panel">
-                <p>Status: <span id="status-text">Initializing...</span></p>
-                <p>Sensor: <span id="delta-text">Idle</span></p>
-                <div class="timer-grid">
-                    <p>Joints: <span id="timer-joints">0.0s</span></p>
-                    <p>Body: <span id="timer-body">0.0s</span></p>
-                    <p>Gaze: <span id="timer-gaze">0.0s</span></p>
+
+            <!-- Alert Overlay (Centered) -->
+            <div id="alert-overlay" class="absolute inset-0 flex items-center justify-center bg-red-500/80 backdrop-blur-sm z-50 hidden transition-opacity duration-300">
+                <div class="text-center animate-bounce">
+                    <p class="text-6xl mb-2">⚠️</p>
+                    <h2 class="text-4xl font-bold tracking-wider">MOVE!</h2>
                 </div>
             </div>
+
+            <!-- Status Badge (Top Left) -->
+            <div class="absolute top-4 left-4 glass rounded-full px-4 py-2 flex items-center gap-2 shadow-lg">
+                <div id="status-indicator" class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <span id="delta-text" class="text-sm font-medium text-gray-200">Idle</span>
+            </div>
+        </div>
+
+        <!-- Controls Panel (Right Side on Desktop, Bottom on Mobile) -->
+        <div class="w-full md:w-80 flex flex-col gap-4">
             
-            <div class="settings">
-                <div class="input-group">
-                    <label>Joints (s): <input type="number" id="time-joints" value="1500" min="5"></label>
-                    <label>Body (s): <input type="number" id="time-body" value="1800" min="10"></label>
-                    <label>Gaze (s): <input type="number" id="time-gaze" value="120" min="5"></label>
-                    <label title="Posture Sensitivity">Posture Sens: <input type="range" id="sensitivity" value="50" min="1" max="100"></label>
-                    <label title="Motion Detection Sensitivity">Motion Sens: <input type="range" id="motion-sensitivity" value="50" min="1" max="100"></label>
+            <!-- Dashboard Card -->
+            <div class="glass rounded-2xl p-6 flex flex-col gap-6 shadow-xl">
+                <div>
+                    <h1 class="text-xl font-semibold text-white tracking-tight">Posture Monitor</h1>
+                    <p id="status-text" class="text-xs text-gray-400 mt-1">Initializing...</p>
                 </div>
-                <button id="start-btn">Start Monitor</button>
+
+                <!-- Timers Grid -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="flex flex-col items-center p-3 bg-white/5 rounded-xl border border-white/5">
+                        <span id="timer-joints" class="text-xl font-mono font-medium text-emerald-400">0.0s</span>
+                        <span class="text-[10px] uppercase tracking-wider text-gray-500 mt-1">Joints</span>
+                    </div>
+                    <div class="flex flex-col items-center p-3 bg-white/5 rounded-xl border border-white/5">
+                        <span id="timer-body" class="text-xl font-mono font-medium text-emerald-400">0.0s</span>
+                        <span class="text-[10px] uppercase tracking-wider text-gray-500 mt-1">Body</span>
+                    </div>
+                    <div class="flex flex-col items-center p-3 bg-white/5 rounded-xl border border-white/5">
+                        <span id="timer-gaze" class="text-xl font-mono font-medium text-emerald-400">0.0s</span>
+                        <span class="text-[10px] uppercase tracking-wider text-gray-500 mt-1">Gaze</span>
+                    </div>
+                </div>
+
+                <!-- Main Action -->
+                <button id="start-btn" class="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 transition-all font-semibold shadow-lg shadow-blue-500/20">
+                    Start Monitor
+                </button>
+            </div>
+
+            <!-- Settings Toggle -->
+            <div class="glass rounded-2xl p-1 flex-1 overflow-hidden flex flex-col relative">
+                <button id="settings-toggle" class="w-full p-4 flex justify-between items-center text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
+                    <span>Configuration</span>
+                    <svg class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+
+                <div id="settings-panel" class="p-5 flex flex-col gap-5 overflow-y-auto hide-scrollbar h-full hidden">
+
+                    <!-- Time Limits -->
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Time Limits (Sec)</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <label for="time-joints" class="text-sm text-gray-300">Joints</label>
+                                <input type="number" id="time-joints" value="1500" class="w-20 bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-right text-sm focus:outline-none focus:border-blue-500 transition-colors">
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label for="time-body" class="text-sm text-gray-300">Body</label>
+                                <input type="number" id="time-body" value="1800" class="w-20 bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-right text-sm focus:outline-none focus:border-blue-500 transition-colors">
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label for="time-gaze" class="text-sm text-gray-300">Gaze</label>
+                                <input type="number" id="time-gaze" value="120" class="w-20 bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-right text-sm focus:outline-none focus:border-blue-500 transition-colors">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sensitivities -->
+                    <div class="space-y-4">
+                        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sensitivity</h3>
+
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-gray-400">
+                                <span>Posture</span>
+                                <span id="val-sens">50%</span>
+                            </div>
+                            <input type="range" id="sensitivity" min="1" max="100" value="50" class="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        </div>
+
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-gray-400">
+                                <span>Motion</span>
+                                <span id="val-motion">50%</span>
+                            </div>
+                            <input type="range" id="motion-sensitivity" min="1" max="100" value="50" class="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-green-500">
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
     </div>
+
+    <script>
+        // Simple UI Logic for Settings Toggle
+        const settingsBtn = document.getElementById('settings-toggle');
+        const settingsPanel = document.getElementById('settings-panel');
+        const arrow = settingsBtn.querySelector('svg');
+
+        settingsBtn.addEventListener('click', () => {
+            settingsPanel.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        });
+
+        // Range Value Updates
+        ['sensitivity', 'motion-sensitivity'].forEach(id => {
+            const el = document.getElementById(id);
+            const disp = document.getElementById(id === 'sensitivity' ? 'val-sens' : 'val-motion');
+            el.addEventListener('input', () => disp.innerText = el.value + '%');
+        });
+    </script>
     <script src="app.js"></script>
 </body>
 </html>
