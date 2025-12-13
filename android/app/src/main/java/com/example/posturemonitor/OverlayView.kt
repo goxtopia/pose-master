@@ -8,6 +8,9 @@ import android.util.AttributeSet
 import android.view.View
 
 class OverlayView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
+    init {
+        setWillNotDraw(false)
+    }
     private var landmarks: List<Point3D>? = null
     private val paintLine = Paint().apply {
         color = Color.GREEN

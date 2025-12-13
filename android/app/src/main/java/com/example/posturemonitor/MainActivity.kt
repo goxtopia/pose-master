@@ -394,6 +394,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             cameraProvider = cameraProviderFuture.get()
 
             val preview = Preview.Builder().build()
+            // Force TextureView implementation for better Z-order compatibility with OverlayView
+            viewFinder.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             preview.setSurfaceProvider(viewFinder.surfaceProvider)
 
             imageAnalyzer = ImageAnalysis.Builder()
