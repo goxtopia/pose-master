@@ -159,6 +159,38 @@
                 android:max="100"
                 android:progress="60"/>
 
+            <!-- TTS Settings -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#55FFFFFF"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"/>
+
+            <Switch
+                android:id="@+id/switch_local_tts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Use Local TTS"
+                android:textColor="#FFFFFF"
+                android:minHeight="48dp"/>
+
+            <TextView
+                android:id="@+id/label_tts_engine"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TTS Engine"
+                android:textColor="#DDDDDD"
+                android:textSize="12sp"
+                android:visibility="gone"/>
+            <Spinner
+                android:id="@+id/spinner_tts_engine"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:background="#33FFFFFF"
+                android:minHeight="48dp"/>
+
         </LinearLayout>
     </ScrollView>
 

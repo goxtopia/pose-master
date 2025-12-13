@@ -7,12 +7,18 @@ import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.tts.TextToSpeech
+import android.speech.tts.TextToSpeech.EngineInfo
 import android.util.Log
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.SeekBar
+import android.widget.Spinner
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,13 +35,14 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import org.json.JSONObject
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var viewFinder: PreviewView
     private lateinit var overlay: OverlayView
 
@@ -56,6 +63,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var inputGaze: EditText
     private lateinit var seekSensitivity: SeekBar
     private lateinit var seekMotionSensitivity: SeekBar
+
+    // TTS UI
+    private lateinit var switchLocalTts: Switch
+    private lateinit var labelTtsEngine: TextView
+    private lateinit var spinnerTtsEngine: Spinner
 
     private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var imageAnalyzer: ImageAnalysis? = null
@@ -79,6 +91,12 @@ class MainActivity : AppCompatActivity() {
     private var lastAlertTime = 0L
     private var lastSentAlertType: String? = null
 
+    // TTS State
+    private var tts: TextToSpeech? = null
+    private var availableEngines: List<EngineInfo> = emptyList()
+    private var selectedEnginePackage: String? = null
+    private var isTtsReady = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -101,6 +119,13 @@ class MainActivity : AppCompatActivity() {
         inputGaze = findViewById(R.id.input_gaze)
         seekSensitivity = findViewById(R.id.seek_sensitivity)
         seekMotionSensitivity = findViewById(R.id.seek_motion_sensitivity)
+
+        switchLocalTts = findViewById(R.id.switch_local_tts)
+        labelTtsEngine = findViewById(R.id.label_tts_engine)
+        spinnerTtsEngine = findViewById(R.id.spinner_tts_engine)
+
+        // Initialize TTS with default engine
+        initTts(null)
 
         if (allPermissionsGranted()) {
             setupMediaPipe()
@@ -157,6 +182,92 @@ class MainActivity : AppCompatActivity() {
         }
         seekSensitivity.setOnSeekBarChangeListener(seekListener)
         seekMotionSensitivity.setOnSeekBarChangeListener(seekListener)
+
+        // TTS Listeners
+        switchLocalTts.setOnCheckedChangeListener { _, isChecked ->
+            updateTtsUiVisibility(isChecked)
+            saveConfig()
+        }
+
+        spinnerTtsEngine.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (position >= 0 && position < availableEngines.size) {
+                    val newPkg = availableEngines[position].name
+                    if (newPkg != selectedEnginePackage) {
+                        Log.d(TAG, "Switching TTS Engine to: $newPkg")
+                        selectedEnginePackage = newPkg
+                        initTts(newPkg)
+                        saveConfig()
+                    }
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    private fun initTts(packageName: String?) {
+        // Shutdown old instance if exists
+        try {
+            tts?.stop()
+            tts?.shutdown()
+        } catch (e: Exception) { Log.e(TAG, "Error stopping old TTS: $e") }
+
+        isTtsReady = false
+        tts = if (packageName != null) {
+            TextToSpeech(this, this, packageName)
+        } else {
+            TextToSpeech(this, this)
+        }
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            val result = tts?.setLanguage(Locale.CHINESE) // Default to Chinese
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                 Log.e(TAG, "TTS Language not supported")
+                 // Fallback to English?
+                 tts?.setLanguage(Locale.ENGLISH)
+            }
+            isTtsReady = true
+            populateTtsEngines()
+        } else {
+            Log.e(TAG, "TTS Initialization failed")
+        }
+    }
+
+    private fun populateTtsEngines() {
+        if (tts == null) return
+        try {
+            availableEngines = tts!!.engines
+            val engineNames = availableEngines.map { "${it.label} (${it.name})" }
+
+            val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, engineNames)
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            spinnerTtsEngine.adapter = adapter
+
+            // Set selection if we have a current package
+            if (selectedEnginePackage == null) {
+                 selectedEnginePackage = tts!!.defaultEngine
+            }
+
+            val index = availableEngines.indexOfFirst { it.name == selectedEnginePackage }
+            if (index != -1) {
+                spinnerTtsEngine.setSelection(index, false)
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get TTS engines: $e")
+        }
+    }
+
+    private fun updateTtsUiVisibility(isLocal: Boolean) {
+        if (isLocal) {
+            labelTtsEngine.visibility = View.VISIBLE
+            spinnerTtsEngine.visibility = View.VISIBLE
+        } else {
+            labelTtsEngine.visibility = View.GONE
+            spinnerTtsEngine.visibility = View.GONE
+        }
     }
 
     private fun updateConfigFromUI() {
@@ -199,6 +310,21 @@ class MainActivity : AppCompatActivity() {
                                 if (json.has("gaze")) inputGaze.setText(json.getInt("gaze").toString())
                                 if (json.has("sensitivity")) seekSensitivity.progress = json.getInt("sensitivity")
                                 if (json.has("motionSensitivity")) seekMotionSensitivity.progress = json.getInt("motionSensitivity")
+
+                                // Load TTS settings
+                                if (json.has("useLocalTts")) {
+                                    val useLocal = json.getBoolean("useLocalTts")
+                                    switchLocalTts.isChecked = useLocal
+                                    updateTtsUiVisibility(useLocal)
+                                }
+                                if (json.has("ttsEngine")) {
+                                    val savedEngine = json.getString("ttsEngine")
+                                    if (savedEngine != selectedEnginePackage) {
+                                         selectedEnginePackage = savedEngine
+                                         initTts(savedEngine)
+                                    }
+                                }
+
                                 updateConfigFromUI()
                                 Log.d(TAG, "Config loaded")
                             }
@@ -223,6 +349,10 @@ class MainActivity : AppCompatActivity() {
             json.put("gaze", inputGaze.text.toString().toIntOrNull() ?: 600)
             json.put("sensitivity", seekSensitivity.progress)
             json.put("motionSensitivity", seekMotionSensitivity.progress)
+
+            // Save TTS settings
+            json.put("useLocalTts", switchLocalTts.isChecked)
+            json.put("ttsEngine", selectedEnginePackage ?: "")
 
             val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
             val request = Request.Builder().url(url).post(body).build()
@@ -425,27 +555,41 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun triggerAlert(type: String?) {
-        val ip = inputServerIp.text.toString()
-        if (ip.isEmpty()) return
-
-        val endpoint = when(type) {
-            "joints", "gaze", "body" -> "/api/say"
-            else -> "/api/relax"
-        }
-
         val messages = mapOf(
             "joints" to "长时间保持一个姿势了，活动一下关节吧",
             "body" to "坐太久了，起来走两步吧",
             "gaze" to "眼睛累了吗，看看远处吧"
         )
 
-        val json = if (type in messages) {
-             "{\"text\": \"${messages[type]}\"}"
-        } else {
-            "{}"
-        }
+        // Determine what to say
+        val messageToSpeak = messages[type] ?: "请放松一下" // Fallback for 'relax' or unknown
 
-        sendApiRequest(endpoint, json)
+        if (switchLocalTts.isChecked) {
+            // Local TTS
+            if (isTtsReady && tts != null) {
+                Log.d(TAG, "Local TTS speaking: $messageToSpeak")
+                tts?.speak(messageToSpeak, TextToSpeech.QUEUE_FLUSH, null, "alert_${System.currentTimeMillis()}")
+            } else {
+                Log.e(TAG, "Local TTS not ready")
+            }
+        } else {
+            // Server TTS
+            val ip = inputServerIp.text.toString()
+            if (ip.isEmpty()) return
+
+            val endpoint = when(type) {
+                "joints", "gaze", "body" -> "/api/say"
+                else -> "/api/relax"
+            }
+
+            val json = if (type in messages) {
+                 "{\"text\": \"${messages[type]}\"}"
+            } else {
+                "{}"
+            }
+
+            sendApiRequest(endpoint, json)
+        }
     }
 
     private fun sendApiRequest(endpoint: String, jsonBody: String?) {
@@ -488,6 +632,8 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         cameraExecutor.shutdown()
         landmarker?.close()
+        tts?.stop()
+        tts?.shutdown()
     }
 
     companion object {
