@@ -19,6 +19,7 @@ async function triggerXiaoAiAlert(type) {
         ],
         gaze: [
             '眼睛累了吗，看看远处吧',
+            '动动脖子，保护肩颈',
             '眺望一下远方，保护视力',
             '闭目养神一会儿吧',
             '给眼睛放个假，看看窗外'

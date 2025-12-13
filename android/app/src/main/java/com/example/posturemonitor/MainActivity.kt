@@ -99,6 +99,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Keep screen on to prevent sleeping during monitoring
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
 
         // Bind UI
@@ -274,7 +276,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         try {
             val joints = inputJoints.text.toString().toLongOrNull() ?: 1500
             val body = inputBody.text.toString().toLongOrNull() ?: 1800
-            val gaze = inputGaze.text.toString().toLongOrNull() ?: 600
+            val gaze = inputGaze.text.toString().toLongOrNull() ?: 120
             val sens = seekSensitivity.progress
             val motionSens = seekMotionSensitivity.progress
 
@@ -350,7 +352,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             val json = JSONObject()
             json.put("joints", inputJoints.text.toString().toIntOrNull() ?: 1500)
             json.put("body", inputBody.text.toString().toIntOrNull() ?: 1800)
-            json.put("gaze", inputGaze.text.toString().toIntOrNull() ?: 600)
+            json.put("gaze", inputGaze.text.toString().toIntOrNull() ?: 120)
             json.put("sensitivity", seekSensitivity.progress)
             json.put("motionSensitivity", seekMotionSensitivity.progress)
 
@@ -580,7 +582,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val messages = mapOf(
             "joints" to "长时间保持一个姿势了，活动一下关节吧",
             "body" to "坐太久了，起来走两步吧",
-            "gaze" to "眼睛累了吗，看看远处吧"
+            "gaze" to "动动脖子，保护肩颈"
         )
 
         // Determine what to say
