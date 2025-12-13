@@ -481,10 +481,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val landmarks = result.landmarks()
         val now = System.currentTimeMillis()
         val isVerificationCheck = (now - lastPixelMotionTime > AWAY_TIMEOUT)
-        // it.visibility().orElse(0f)
         if (landmarks.isNotEmpty() && landmarks[0].isNotEmpty()) {
             val rawList = landmarks[0].map {
-                Point3D(it.x(), it.y(), it.z(), 0F)
+                // We default visibility to 1f because retrieving the optional visibility can be problematic
+                // on some MediaPipe versions, and we want to ensure joints are displayed.
+                // Note: We MUST pass 1f even for head joints (indices <= 10) because PostureMonitor
+                // needs them (nose, ears) for Gaze detection (calculateYaw).
+                // The OverlayView class explicitly filters out indices <= 10 from drawing, so they won't be displayed.
+                Point3D(it.x(), it.y(), it.z(), 1f)
             }
 
             overlay.setLandmarks(rawList)
