@@ -1,12 +1,19 @@
 package com.example.posturemonitor
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.TextToSpeech.EngineInfo
 import android.util.Log
@@ -85,6 +92,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val motionDetector = MotionDetector()
     private var landmarker: PoseLandmarker? = null
 
+    // System Services
+    private lateinit var audioManager: AudioManager
+    private lateinit var vibrator: Vibrator
+
     // State
     private var isUserAway = false
     private var lastPixelMotionTime = System.currentTimeMillis()
@@ -106,6 +117,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         // Keep screen on to prevent sleeping during monitoring
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
+
+        // Initialize System Services
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
 
         // Bind UI
         viewFinder = findViewById(R.id.viewFinder)
@@ -294,9 +315,28 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun setUiVisibility(visible: Boolean) {
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // If app is running, enter PiP mode automatically
+        if (isRunning) {
+            enterPictureInPictureMode()
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        if (isInPictureInPictureMode) {
+            // Hide everything, including restore button (not interactive in PiP)
+            setUiVisibility(false, hideRestoreButton = true)
+        } else {
+            // Restore UI
+            setUiVisibility(true)
+        }
+    }
+
+    private fun setUiVisibility(visible: Boolean, hideRestoreButton: Boolean = false) {
         val v = if (visible) View.VISIBLE else View.GONE
-        val restoreV = if (visible) View.GONE else View.VISIBLE
+        val restoreV = if (visible || hideRestoreButton) View.GONE else View.VISIBLE
 
         statusText.visibility = v
         deltaText.visibility = v
@@ -607,6 +647,22 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         // Determine what to say
         val messageToSpeak = messages[type] ?: fallback
 
+        // Vibration Logic
+        val ringerMode = audioManager.ringerMode
+        if (ringerMode == AudioManager.RINGER_MODE_SILENT || ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
+            if (vibrator.hasVibrator()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(500)
+                }
+            }
+            // If strictly silent, don't speak
+            if (ringerMode == AudioManager.RINGER_MODE_SILENT) {
+                return
+            }
+        }
 
         if (switchLocalTts.isChecked) {
             // Local TTS
