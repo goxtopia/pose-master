@@ -123,6 +123,33 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"/>
 
+        <!-- Hide UI Button -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/btn_hide_ui"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="24dp"
+            app:fabSize="mini"
+            app:backgroundTint="#40FFFFFF"
+            app:tint="#FFFFFF"
+            android:src="@android:drawable/ic_menu_view"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/btn_start"/>
+
+        <!-- Restore UI Button (Initially Hidden) -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/btn_restore_ui"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="24dp"
+            app:fabSize="normal"
+            app:backgroundTint="#2196F3"
+            app:tint="#FFFFFF"
+            android:src="@android:drawable/ic_menu_view"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
         <!-- Alert Overlay -->
         <TextView
             android:id="@+id/alert_overlay"
@@ -273,6 +300,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Local TTS"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    app:thumbTint="#FFFFFF"
+                    app:trackTint="#88FFFFFF"/>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_show_face"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Show Face Points"
                     android:textColor="#FFFFFF"
                     android:textSize="14sp"
                     app:thumbTint="#FFFFFF"
