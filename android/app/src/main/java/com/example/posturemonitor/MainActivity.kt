@@ -97,6 +97,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var vibrator: Vibrator
 
     // State
+    private var isUiHidden = false
+    private var isPipMode = false
     private var isUserAway = false
     private var lastPixelMotionTime = System.currentTimeMillis()
     private val AWAY_TIMEOUT = 5 * 60 * 1000L
@@ -196,8 +198,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             startCamera()
         }
 
-        btnHideUi.setOnClickListener { setUiVisibility(false) }
-        btnRestoreUi.setOnClickListener { setUiVisibility(true) }
+        btnHideUi.setOnClickListener {
+            isUiHidden = true
+            updateUiVisibility()
+        }
+
+        btnRestoreUi.setOnClickListener {
+            isUiHidden = false
+            updateUiVisibility()
+        }
 
         // Auto-save listeners
         val saveListener = View.OnFocusChangeListener { _, hasFocus ->
@@ -325,31 +334,34 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        if (isInPictureInPictureMode) {
-            // Hide everything, including restore button (not interactive in PiP)
-            setUiVisibility(false, hideRestoreButton = true)
-        } else {
-            // Restore UI
-            setUiVisibility(true)
-        }
+        isPipMode = isInPictureInPictureMode
+        updateUiVisibility()
     }
 
-    private fun setUiVisibility(visible: Boolean, hideRestoreButton: Boolean = false) {
-        val v = if (visible) View.VISIBLE else View.GONE
-        val restoreV = if (visible || hideRestoreButton) View.GONE else View.VISIBLE
+    private fun updateUiVisibility() {
+        val settingsPanel = findViewById<View>(R.id.settings_panel)
+        val statusCard = findViewById<View>(R.id.status_card)
 
-        statusText.visibility = v
-        deltaText.visibility = v
-        timerJoints.visibility = v
-        timerBody.visibility = v
-        timerGaze.visibility = v
-        btnStart.visibility = v
-        btnSwitchCamera.visibility = v
-        btnHideUi.visibility = v
-        findViewById<View>(R.id.status_card).visibility = v // Status Card
-        findViewById<View>(R.id.settings_panel).visibility = v // Settings Panel
+        // Settings: Hidden if PiP OR UserHidden
+        val showSettings = !isPipMode && !isUiHidden
+        settingsPanel.visibility = if (showSettings) View.VISIBLE else View.GONE
 
-        btnRestoreUi.visibility = restoreV
+        // Status: Hidden if PiP. Visible otherwise (Always shown in UserHidden mode per request)
+        val showStatus = !isPipMode
+        statusCard.visibility = if (showStatus) View.VISIBLE else View.GONE
+
+        // Main Buttons: Hidden if PiP OR UserHidden
+        val showControls = !isPipMode && !isUiHidden
+        btnStart.visibility = if (showControls) View.VISIBLE else View.GONE
+        btnSwitchCamera.visibility = if (showControls) View.VISIBLE else View.GONE
+        btnHideUi.visibility = if (showControls) View.VISIBLE else View.GONE
+
+        // Restore Button: Hidden if PiP. Visible ONLY if UserHidden
+        val showRestore = !isPipMode && isUiHidden
+        btnRestoreUi.visibility = if (showRestore) View.VISIBLE else View.GONE
+
+        // Also toggle status/timer texts explicitly (though they are inside status_card)
+        // No need if status_card handles it.
     }
 
     private fun updateConfigFromUI() {
