@@ -481,10 +481,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val landmarks = result.landmarks()
         val now = System.currentTimeMillis()
         val isVerificationCheck = (now - lastPixelMotionTime > AWAY_TIMEOUT)
-
+        // it.visibility().orElse(0f)
         if (landmarks.isNotEmpty() && landmarks[0].isNotEmpty()) {
             val rawList = landmarks[0].map {
-                Point3D(it.x(), it.y(), it.z(), it.visibility().orElse(0f))
+                Point3D(it.x(), it.y(), it.z(), 0F)
             }
 
             overlay.setLandmarks(rawList)
