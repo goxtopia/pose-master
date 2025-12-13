@@ -11,6 +11,12 @@ class OverlayView(context: Context, attrs: AttributeSet?) : View(context, attrs)
     init {
         setWillNotDraw(false)
     }
+    var showFacePoints: Boolean = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     private var landmarks: List<Point3D>? = null
     private val paintLine = Paint().apply {
         color = Color.GREEN
@@ -60,9 +66,10 @@ class OverlayView(context: Context, attrs: AttributeSet?) : View(context, attrs)
             }
         }
 
-        // Draw Landmarks (body only > 10)
+        // Draw Landmarks
         for ((i, p) in list.withIndex()) {
-            if (i > 10 && p.visibility > 0.5f) {
+            // Check visibility threshold and whether to show face points (indices 0-10)
+            if (p.visibility > 0.5f && (showFacePoints || i > 10)) {
                 canvas.drawCircle(p.x * width, p.y * height, 8f, paintPoint)
             }
         }

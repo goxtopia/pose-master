@@ -19,6 +19,7 @@ import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import android.widget.Toast
 import com.google.android.material.switchmaterial.SwitchMaterial
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,6 +57,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var inputServerIp: EditText
     private lateinit var btnStart: Button
     private lateinit var btnSwitchCamera: ImageButton
+    private lateinit var btnHideUi: FloatingActionButton
+    private lateinit var btnRestoreUi: FloatingActionButton
 
     // Settings
     private lateinit var inputJoints: EditText
@@ -66,6 +69,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     // TTS UI
     private lateinit var switchLocalTts: SwitchMaterial
+    private lateinit var switchShowFace: SwitchMaterial
     private lateinit var labelTtsEngine: TextView
     private lateinit var spinnerTtsEngine: Spinner
 
@@ -115,6 +119,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         inputServerIp = findViewById(R.id.input_server_ip)
         btnStart = findViewById(R.id.btn_start)
         btnSwitchCamera = findViewById(R.id.btn_switch_camera)
+        btnHideUi = findViewById(R.id.btn_hide_ui)
+        btnRestoreUi = findViewById(R.id.btn_restore_ui)
 
         inputJoints = findViewById(R.id.input_joints)
         inputBody = findViewById(R.id.input_body)
@@ -123,11 +129,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         seekMotionSensitivity = findViewById(R.id.seek_motion_sensitivity)
 
         switchLocalTts = findViewById(R.id.switch_local_tts)
+        switchShowFace = findViewById(R.id.switch_show_face)
         labelTtsEngine = findViewById(R.id.label_tts_engine)
         spinnerTtsEngine = findViewById(R.id.spinner_tts_engine)
 
+        // Initialize defaults or load from prefs
+        loadConfig()
+
         // Initialize TTS with default engine
-        initTts(null)
+        initTts(selectedEnginePackage)
 
         if (allPermissionsGranted()) {
             setupMediaPipe()
@@ -147,8 +157,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 monitor.reset()
                 lastPixelMotionTime = System.currentTimeMillis()
                 statusText.text = "Status: Running"
-                // Try load config just in case
-                loadConfig()
             } else {
                 btnStart.text = "Start"
                 btnStart.setBackgroundColor(Color.LTGRAY)
@@ -166,6 +174,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             startCamera()
         }
+
+        btnHideUi.setOnClickListener { setUiVisibility(false) }
+        btnRestoreUi.setOnClickListener { setUiVisibility(true) }
 
         // Auto-save listeners
         val saveListener = View.OnFocusChangeListener { _, hasFocus ->
@@ -188,6 +199,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         // TTS Listeners
         switchLocalTts.setOnCheckedChangeListener { _, isChecked ->
             updateTtsUiVisibility(isChecked)
+            saveConfig()
+        }
+
+        switchShowFace.setOnCheckedChangeListener { _, isChecked ->
+            overlay.showFacePoints = isChecked
             saveConfig()
         }
 
@@ -224,11 +240,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            val result = tts?.setLanguage(Locale.CHINESE) // Default to Chinese
+            val systemLocale = Locale.getDefault()
+            val targetLocale = if (systemLocale.language == Locale.CHINESE.language) {
+                Locale.CHINESE
+            } else {
+                Locale.US
+            }
+
+            val result = tts?.setLanguage(targetLocale)
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                 Log.e(TAG, "TTS Language not supported")
-                 // Fallback to English?
-                 tts?.setLanguage(Locale.ENGLISH)
+                 Log.e(TAG, "TTS Language not supported: $targetLocale")
+                 tts?.setLanguage(Locale.US)
             }
             isTtsReady = true
             populateTtsEngines()
@@ -272,6 +294,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun setUiVisibility(visible: Boolean) {
+        val v = if (visible) View.VISIBLE else View.GONE
+        val restoreV = if (visible) View.GONE else View.VISIBLE
+
+        statusText.visibility = v
+        deltaText.visibility = v
+        timerJoints.visibility = v
+        timerBody.visibility = v
+        timerGaze.visibility = v
+        btnStart.visibility = v
+        btnSwitchCamera.visibility = v
+        btnHideUi.visibility = v
+        findViewById<View>(R.id.status_card).visibility = v // Status Card
+        findViewById<View>(R.id.settings_panel).visibility = v // Settings Panel
+
+        btnRestoreUi.visibility = restoreV
+    }
+
     private fun updateConfigFromUI() {
         try {
             val joints = inputJoints.text.toString().toLongOrNull() ?: 1500
@@ -291,85 +331,48 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun loadConfig() {
-        val ip = inputServerIp.text.toString()
-        // Default emulator IP or empty implies skip if not reachable (user request)
-        // But code allows user to change it.
-        // If "10.0.2.2" and we are on real device (implied by user report), it won't connect.
-        // We will proceed but log softly.
-        if (ip.isEmpty()) return
-        val url = "http://$ip:8080/api/config"
+        val prefs = getSharedPreferences("PosturePrefs", MODE_PRIVATE)
 
-        val request = Request.Builder().url(url).build()
-        httpClient.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Failed to load config: $e")
-            }
-            override fun onResponse(call: Call, response: Response) {
-                if (response.isSuccessful) {
-                    val bodyStr = response.body?.string()
-                    if (bodyStr != null) {
-                        try {
-                            val json = JSONObject(bodyStr)
-                            runOnUiThread {
-                                if (json.has("joints")) inputJoints.setText(json.getInt("joints").toString())
-                                if (json.has("body")) inputBody.setText(json.getInt("body").toString())
-                                if (json.has("gaze")) inputGaze.setText(json.getInt("gaze").toString())
-                                if (json.has("sensitivity")) seekSensitivity.progress = json.getInt("sensitivity")
-                                if (json.has("motionSensitivity")) seekMotionSensitivity.progress = json.getInt("motionSensitivity")
+        inputJoints.setText(prefs.getInt("joints", 1500).toString())
+        inputBody.setText(prefs.getInt("body", 1800).toString())
+        inputGaze.setText(prefs.getInt("gaze", 120).toString())
+        seekSensitivity.progress = prefs.getInt("sensitivity", 50)
+        seekMotionSensitivity.progress = prefs.getInt("motionSensitivity", 60)
 
-                                // Load TTS settings
-                                if (json.has("useLocalTts")) {
-                                    val useLocal = json.getBoolean("useLocalTts")
-                                    switchLocalTts.isChecked = useLocal
-                                    updateTtsUiVisibility(useLocal)
-                                }
-                                if (json.has("ttsEngine")) {
-                                    val savedEngine = json.getString("ttsEngine")
-                                    if (savedEngine != selectedEnginePackage) {
-                                         selectedEnginePackage = savedEngine
-                                         initTts(savedEngine)
-                                    }
-                                }
+        // Default Local TTS to true
+        val useLocal = prefs.getBoolean("useLocalTts", true)
+        switchLocalTts.isChecked = useLocal
+        updateTtsUiVisibility(useLocal)
 
-                                updateConfigFromUI()
-                                Log.d(TAG, "Config loaded")
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Json parse error: $e")
-                        }
-                    }
-                }
-            }
-        })
+        selectedEnginePackage = prefs.getString("ttsEngine", null)
+
+        val showFace = prefs.getBoolean("showFacePoints", false)
+        switchShowFace.isChecked = showFace
+        overlay.showFacePoints = showFace
+
+        inputServerIp.setText(prefs.getString("serverIp", "10.0.2.2"))
+
+        updateConfigFromUI()
+        Log.d(TAG, "Config loaded from prefs")
     }
 
     private fun saveConfig() {
-        val ip = inputServerIp.text.toString()
-        if (ip.isEmpty()) return
-        val url = "http://$ip:8080/api/config"
+        val prefs = getSharedPreferences("PosturePrefs", MODE_PRIVATE)
+        val editor = prefs.edit()
 
-        try {
-            val json = JSONObject()
-            json.put("joints", inputJoints.text.toString().toIntOrNull() ?: 1500)
-            json.put("body", inputBody.text.toString().toIntOrNull() ?: 1800)
-            json.put("gaze", inputGaze.text.toString().toIntOrNull() ?: 120)
-            json.put("sensitivity", seekSensitivity.progress)
-            json.put("motionSensitivity", seekMotionSensitivity.progress)
+        editor.putInt("joints", inputJoints.text.toString().toIntOrNull() ?: 1500)
+        editor.putInt("body", inputBody.text.toString().toIntOrNull() ?: 1800)
+        editor.putInt("gaze", inputGaze.text.toString().toIntOrNull() ?: 120)
+        editor.putInt("sensitivity", seekSensitivity.progress)
+        editor.putInt("motionSensitivity", seekMotionSensitivity.progress)
 
-            // Save TTS settings
-            json.put("useLocalTts", switchLocalTts.isChecked)
-            json.put("ttsEngine", selectedEnginePackage ?: "")
+        editor.putBoolean("useLocalTts", switchLocalTts.isChecked)
+        editor.putString("ttsEngine", selectedEnginePackage)
+        editor.putBoolean("showFacePoints", switchShowFace.isChecked)
+        editor.putString("serverIp", inputServerIp.text.toString())
 
-            val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-            val request = Request.Builder().url(url).post(body).build()
-
-            httpClient.newCall(request).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) { Log.e(TAG, "Save failed: $e") }
-                override fun onResponse(call: Call, response: Response) { response.close() }
-            })
-        } catch (e: Exception) {
-            Log.e(TAG, "Save setup failed: $e")
-        }
+        editor.apply()
+        Log.d(TAG, "Config saved to prefs")
     }
 
     private fun setupMediaPipe() {
@@ -583,14 +586,27 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun triggerAlert(type: String?) {
-        val messages = mapOf(
-            "joints" to "长时间保持一个姿势了，活动一下关节吧",
-            "body" to "坐太久了，起来走两步吧",
-            "gaze" to "动动脖子，保护肩颈"
-        )
+        val isChinese = Locale.getDefault().language == Locale.CHINESE.language
+
+        val messages = if (isChinese) {
+            mapOf(
+                "joints" to "长时间保持一个姿势了，活动一下关节吧",
+                "body" to "坐太久了，起来走两步吧",
+                "gaze" to "动动脖子，保护肩颈"
+            )
+        } else {
+            mapOf(
+                "joints" to "You've been in the same position for too long, move your joints.",
+                "body" to "You've been sitting for too long, stand up and walk around.",
+                "gaze" to "Move your neck to protect your shoulders and neck."
+            )
+        }
+
+        val fallback = if (isChinese) "请放松一下" else "Please relax"
 
         // Determine what to say
-        val messageToSpeak = messages[type] ?: "请放松一下" // Fallback for 'relax' or unknown
+        val messageToSpeak = messages[type] ?: fallback
+
 
         if (switchLocalTts.isChecked) {
             // Local TTS
