@@ -3,6 +3,7 @@ package com.example.posturemonitor
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -11,6 +12,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,6 +33,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
     private lateinit var viewFinder: PreviewView
@@ -46,6 +49,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var inputServerIp: EditText
     private lateinit var btnStart: Button
     private lateinit var btnSwitchCamera: ImageButton
+
+    // Settings
+    private lateinit var inputJoints: EditText
+    private lateinit var inputBody: EditText
+    private lateinit var inputGaze: EditText
+    private lateinit var seekSensitivity: SeekBar
+    private lateinit var seekMotionSensitivity: SeekBar
 
     private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var imageAnalyzer: ImageAnalysis? = null
@@ -73,6 +83,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Bind UI
         viewFinder = findViewById(R.id.viewFinder)
         overlay = findViewById(R.id.overlay)
         statusText = findViewById(R.id.status_text)
@@ -85,6 +96,12 @@ class MainActivity : AppCompatActivity() {
         btnStart = findViewById(R.id.btn_start)
         btnSwitchCamera = findViewById(R.id.btn_switch_camera)
 
+        inputJoints = findViewById(R.id.input_joints)
+        inputBody = findViewById(R.id.input_body)
+        inputGaze = findViewById(R.id.input_gaze)
+        seekSensitivity = findViewById(R.id.seek_sensitivity)
+        seekMotionSensitivity = findViewById(R.id.seek_motion_sensitivity)
+
         if (allPermissionsGranted()) {
             setupMediaPipe()
             startCamera()
@@ -96,15 +113,20 @@ class MainActivity : AppCompatActivity() {
             isRunning = !isRunning
             if (isRunning) {
                 btnStart.text = "Stop"
+                btnStart.setBackgroundColor(Color.RED)
+                // Apply config
+                updateConfigFromUI()
+
                 monitor.reset()
                 lastPixelMotionTime = System.currentTimeMillis()
                 statusText.text = "Status: Running"
-                // Load config from server if possible, but for now use defaults
+                // Try load config just in case
+                loadConfig()
             } else {
                 btnStart.text = "Start"
+                btnStart.setBackgroundColor(Color.LTGRAY)
                 statusText.text = "Status: Stopped"
                 alertOverlay.visibility = View.GONE
-                // Send stop to server
                 sendApiRequest("/api/stop", null)
             }
         }
@@ -117,6 +139,101 @@ class MainActivity : AppCompatActivity() {
             }
             startCamera()
         }
+
+        // Auto-save listeners
+        val saveListener = View.OnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) saveConfig()
+        }
+        inputJoints.onFocusChangeListener = saveListener
+        inputBody.onFocusChangeListener = saveListener
+        inputGaze.onFocusChangeListener = saveListener
+
+        val seekListener = object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) updateConfigFromUI() // Live update
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) { saveConfig() }
+        }
+        seekSensitivity.setOnSeekBarChangeListener(seekListener)
+        seekMotionSensitivity.setOnSeekBarChangeListener(seekListener)
+    }
+
+    private fun updateConfigFromUI() {
+        try {
+            val joints = inputJoints.text.toString().toLongOrNull() ?: 1500
+            val body = inputBody.text.toString().toLongOrNull() ?: 1800
+            val gaze = inputGaze.text.toString().toLongOrNull() ?: 600
+            val sens = seekSensitivity.progress
+            val motionSens = seekMotionSensitivity.progress
+
+            monitor.updateConfig(
+                PostureMonitor.Limits(joints * 1000, body * 1000, gaze * 1000),
+                sens
+            )
+            motionDetector.updateSensitivity(motionSens)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating config: $e")
+        }
+    }
+
+    private fun loadConfig() {
+        val ip = inputServerIp.text.toString()
+        if (ip.isEmpty()) return
+        val url = "http://$ip:8080/api/config"
+
+        val request = Request.Builder().url(url).build()
+        httpClient.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                Log.e(TAG, "Failed to load config: $e")
+            }
+            override fun onResponse(call: Call, response: Response) {
+                if (response.isSuccessful) {
+                    val bodyStr = response.body?.string()
+                    if (bodyStr != null) {
+                        try {
+                            val json = JSONObject(bodyStr)
+                            runOnUiThread {
+                                if (json.has("joints")) inputJoints.setText(json.getInt("joints").toString())
+                                if (json.has("body")) inputBody.setText(json.getInt("body").toString())
+                                if (json.has("gaze")) inputGaze.setText(json.getInt("gaze").toString())
+                                if (json.has("sensitivity")) seekSensitivity.progress = json.getInt("sensitivity")
+                                if (json.has("motionSensitivity")) seekMotionSensitivity.progress = json.getInt("motionSensitivity")
+                                updateConfigFromUI()
+                                Log.d(TAG, "Config loaded")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Json parse error: $e")
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    private fun saveConfig() {
+        val ip = inputServerIp.text.toString()
+        if (ip.isEmpty()) return
+        val url = "http://$ip:8080/api/config"
+
+        try {
+            val json = JSONObject()
+            json.put("joints", inputJoints.text.toString().toIntOrNull() ?: 1500)
+            json.put("body", inputBody.text.toString().toIntOrNull() ?: 1800)
+            json.put("gaze", inputGaze.text.toString().toIntOrNull() ?: 600)
+            json.put("sensitivity", seekSensitivity.progress)
+            json.put("motionSensitivity", seekMotionSensitivity.progress)
+
+            val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+            val request = Request.Builder().url(url).post(body).build()
+
+            httpClient.newCall(request).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) { Log.e(TAG, "Save failed: $e") }
+                override fun onResponse(call: Call, response: Response) { response.close() }
+            })
+        } catch (e: Exception) {
+            Log.e(TAG, "Save setup failed: $e")
+        }
     }
 
     private fun setupMediaPipe() {
@@ -126,17 +243,9 @@ class MainActivity : AppCompatActivity() {
 
         val options = PoseLandmarkerOptions.builder()
             .setBaseOptions(baseOptions)
-            .setRunningMode(RunningMode.IMAGE) // Using IMAGE mode for manual sync control inside analysis
-            // OR use VIDEO/LIVE_STREAM mode. LIVE_STREAM is better for async but we need to control flow with motion detection.
-            // Let's use LIVE_STREAM but only feed it when we want?
-            // Actually, `checkMotion` runs on Bitmap.
-            // Let's use LIVE_STREAM mode.
             .setRunningMode(RunningMode.LIVE_STREAM)
             .setResultListener { result, image ->
-                // Handle results
-                runOnUiThread {
-                    processLandmarks(result)
-                }
+                runOnUiThread { processLandmarks(result) }
             }
             .setErrorListener { e -> Log.e(TAG, "MediaPipe error: $e") }
             .build()
@@ -193,8 +302,6 @@ class MainActivity : AppCompatActivity() {
              bitmap.copyPixelsFromBuffer(it.planes[0].buffer)
         }
 
-        // 1. Motion Detection
-        // Resize for performance in motion detector
         val motionBitmap = Bitmap.createScaledBitmap(bitmap, 64, 36, true)
         val hasMotion = motionDetector.checkMotion(motionBitmap)
 
@@ -220,22 +327,15 @@ class MainActivity : AppCompatActivity() {
                 isUserAway = false
                 monitor.reset()
             }
-            // Feed to MediaPipe
             detectPose(bitmap, now)
         } else {
-            // No Motion
             if (isUserAway) {
                 // Do nothing
             } else {
                  if (now - lastPixelMotionTime > AWAY_TIMEOUT) {
-                     // Check if user really gone by running pose once
                      detectPose(bitmap, now)
-                     // Logic inside processLandmarks will determine if user is present
                  } else {
-                     // Assume static user
-                     runOnUiThread {
-                        updateMonitorState(null, false)
-                     }
+                     runOnUiThread { updateMonitorState(null, false) }
                  }
             }
         }
@@ -272,7 +372,7 @@ class MainActivity : AppCompatActivity() {
                  isUserAway = true
                  monitor.reset()
              } else {
-                 updateMonitorState(null, true) // Treating empty as movement/noise or just reset? JS treats as null logic.
+                 updateMonitorState(null, true)
              }
         }
     }
@@ -284,7 +384,6 @@ class MainActivity : AppCompatActivity() {
         timerBody.text = "Body: %.1fs".format(state.timers["body"])
         timerGaze.text = "Gaze: %.1fs".format(state.timers["gaze"])
 
-        // Colors
         val lim = monitor.limits
         timerJoints.setTextColor(if(state.timers["joints"]!! * 1000 > lim.joints * 0.8) Color.YELLOW else Color.GREEN)
         timerBody.setTextColor(if(state.timers["body"]!! * 1000 > lim.body * 0.8) Color.YELLOW else Color.GREEN)
@@ -308,7 +407,7 @@ class MainActivity : AppCompatActivity() {
                 val overtimeMs = currentDurationMs - limitMs
                 val coefficient = 300000L
                 alertInterval = (60000.0 / (1 + (overtimeMs.toDouble() / coefficient))).toLong()
-                alertInterval = max(10000L, alertInterval)
+                alertInterval = java.lang.Math.max(10000L, alertInterval)
             }
 
             if (now - lastAlertTime > alertInterval || state.alertType != lastSentAlertType) {
@@ -329,7 +428,6 @@ class MainActivity : AppCompatActivity() {
         val ip = inputServerIp.text.toString()
         if (ip.isEmpty()) return
 
-        // Construct endpoint logic similar to JS
         val endpoint = when(type) {
             "joints", "gaze", "body" -> "/api/say"
             else -> "/api/relax"
