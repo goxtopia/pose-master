@@ -1,0 +1,7 @@
+{
+    "joints": 1500,
+    "body": 1800,
+    "gaze": 600,
+    "sensitivity": 50,
+    "motionSensitivity": 60
+}
