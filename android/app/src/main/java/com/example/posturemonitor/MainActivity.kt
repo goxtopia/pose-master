@@ -290,6 +290,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun loadConfig() {
         val ip = inputServerIp.text.toString()
+        // Default emulator IP or empty implies skip if not reachable (user request)
+        // But code allows user to change it.
+        // If "10.0.2.2" and we are on real device (implied by user report), it won't connect.
+        // We will proceed but log softly.
         if (ip.isEmpty()) return
         val url = "http://$ip:8080/api/config"
 
@@ -427,12 +431,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             return
         }
 
-        val bitmap = Bitmap.createBitmap(
+        val rawBitmap = Bitmap.createBitmap(
             imageProxy.width, imageProxy.height, Bitmap.Config.ARGB_8888
         )
-        imageProxy.use {
-             bitmap.copyPixelsFromBuffer(it.planes[0].buffer)
+        // Copy pixels
+        rawBitmap.copyPixelsFromBuffer(imageProxy.planes[0].buffer)
+
+        // Rotate bitmap to match display orientation
+        val rotation = imageProxy.imageInfo.rotationDegrees
+        val bitmap = if (rotation != 0) {
+            val matrix = android.graphics.Matrix()
+            matrix.postRotate(rotation.toFloat())
+            Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
+        } else {
+            rawBitmap
         }
+
+        // Close proxy
+        imageProxy.close()
 
         val motionBitmap = Bitmap.createScaledBitmap(bitmap, 64, 36, true)
         val hasMotion = motionDetector.checkMotion(motionBitmap)
