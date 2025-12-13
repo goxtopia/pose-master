@@ -170,18 +170,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         btnStart.setOnClickListener {
             isRunning = !isRunning
             if (isRunning) {
-                btnStart.text = "Stop"
+                btnStart.text = getString(R.string.btn_stop)
                 btnStart.setBackgroundColor(Color.RED)
                 // Apply config
                 updateConfigFromUI()
 
                 monitor.reset()
                 lastPixelMotionTime = System.currentTimeMillis()
-                statusText.text = "Status: Running"
+                statusText.text = getString(R.string.status_running)
             } else {
-                btnStart.text = "Start"
+                btnStart.text = getString(R.string.btn_start)
                 btnStart.setBackgroundColor(Color.LTGRAY)
-                statusText.text = "Status: Stopped"
+                statusText.text = getString(R.string.status_stopped)
                 alertOverlay.visibility = View.GONE
                 sendApiRequest("/api/stop", null)
             }
@@ -502,13 +502,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         runOnUiThread {
             if (isUserAway) {
-                deltaText.text = "User Away (Paused)"
+                deltaText.text = getString(R.string.sensor_away)
                 deltaText.setTextColor(Color.RED)
             } else if (hasMotion) {
-                deltaText.text = "Active"
+                deltaText.text = getString(R.string.sensor_active)
                 deltaText.setTextColor(Color.GREEN)
             } else {
-                deltaText.text = "Static"
+                deltaText.text = getString(R.string.sensor_static)
                 deltaText.setTextColor(Color.BLUE)
             }
         }
@@ -581,9 +581,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun updateMonitorState(landmarks: List<Point3D>?, physicalMotion: Boolean) {
         val state = monitor.process(landmarks, physicalMotion)
 
-        timerJoints.text = "Joints: %.1fs".format(state.timers["joints"])
-        timerBody.text = "Body: %.1fs".format(state.timers["body"])
-        timerGaze.text = "Gaze: %.1fs".format(state.timers["gaze"])
+        timerJoints.text = getString(R.string.timer_joints, state.timers["joints"])
+        timerBody.text = getString(R.string.timer_body, state.timers["body"])
+        timerGaze.text = getString(R.string.timer_gaze, state.timers["gaze"])
 
         val lim = monitor.limits
         timerJoints.setTextColor(if(state.timers["joints"]!! * 1000 > lim.joints * 0.8) Color.YELLOW else Color.GREEN)
@@ -592,7 +592,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         if (state.alertType != null) {
             alertOverlay.visibility = View.VISIBLE
-            alertOverlay.text = "⚠️ ${state.alertType.toUpperCase()} ALERT ⚠️"
+            alertOverlay.text = getString(R.string.alert_prefix, state.alertType.toUpperCase())
 
             val now = System.currentTimeMillis()
             var alertInterval = 60000L
@@ -626,23 +626,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun triggerAlert(type: String?) {
-        val isChinese = Locale.getDefault().language == Locale.CHINESE.language
+        val messages = mapOf(
+            "joints" to getString(R.string.msg_joints),
+            "body" to getString(R.string.msg_body),
+            "gaze" to getString(R.string.msg_gaze)
+        )
 
-        val messages = if (isChinese) {
-            mapOf(
-                "joints" to "长时间保持一个姿势了，活动一下关节吧",
-                "body" to "坐太久了，起来走两步吧",
-                "gaze" to "动动脖子，保护肩颈"
-            )
-        } else {
-            mapOf(
-                "joints" to "You've been in the same position for too long, move your joints.",
-                "body" to "You've been sitting for too long, stand up and walk around.",
-                "gaze" to "Move your neck to protect your shoulders and neck."
-            )
-        }
-
-        val fallback = if (isChinese) "请放松一下" else "Please relax"
+        val fallback = getString(R.string.msg_relax)
 
         // Determine what to say
         val messageToSpeak = messages[type] ?: fallback
