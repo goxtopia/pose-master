@@ -28,6 +28,6 @@
     <!-- Alerts -->
     <string name="msg_joints">You\'ve been in the same position for too long, move your joints.</string>
     <string name="msg_body">You\'ve been sitting for too long, stand up and walk around.</string>
-    <string name="msg_gaze">Move your neck to protect your shoulders and neck.</string>
+    <string name="msg_gaze">Move your neck to protect your shoulders.</string>
     <string name="msg_relax">Please relax</string>
 </resources>
