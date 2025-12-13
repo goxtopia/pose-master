@@ -45,7 +45,7 @@
                     android:id="@+id/status_text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Status: Init"
+                    android:text="@string/status_init"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
                     android:alpha="0.8"/>
@@ -54,7 +54,7 @@
                     android:id="@+id/delta_text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Sensor: Idle"
+                    android:text="@string/sensor_idle"
                     android:textColor="#FFFFFF"
                     android:textStyle="bold"
                     android:textSize="14sp"
@@ -102,7 +102,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_margin="24dp"
-            android:text="Start"
+            android:text="@string/btn_start"
             android:textColor="#FFFFFF"
             android:backgroundTint="#2196F3"
             app:icon="@android:drawable/ic_media_play"
@@ -158,7 +158,7 @@
             android:background="#CCFF0000"
             android:paddingHorizontal="32dp"
             android:paddingVertical="16dp"
-            android:text="⚠️ MOVE! ⚠️"
+            android:text="@string/alert_move"
             android:textColor="#FFFFFF"
             android:textSize="24sp"
             android:textStyle="bold"
@@ -201,7 +201,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="CONFIGURATION"
+                    android:text="@string/config_title"
                     android:textColor="#88FFFFFF"
                     android:textSize="10sp"
                     android:letterSpacing="0.1"/>
@@ -209,7 +209,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Joints (s)"
+                    android:text="@string/label_joints_time"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
                     android:layout_marginTop="12dp"/>
@@ -226,7 +226,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Body (s)"
+                    android:text="@string/label_body_time"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
                     android:layout_marginTop="8dp"/>
@@ -243,7 +243,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Gaze (s)"
+                    android:text="@string/label_gaze_time"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
                     android:layout_marginTop="8dp"/>
@@ -260,7 +260,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Sensitivity"
+                    android:text="@string/label_sensitivity"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
                     android:layout_marginTop="16dp"/>
@@ -276,7 +276,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Motion Sens"
+                    android:text="@string/label_motion_sens"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
                     android:layout_marginTop="8dp"/>
@@ -299,7 +299,7 @@
                     android:id="@+id/switch_local_tts"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Local TTS"
+                    android:text="@string/switch_local_tts"
                     android:textColor="#FFFFFF"
                     android:textSize="14sp"
                     app:thumbTint="#FFFFFF"
@@ -309,7 +309,7 @@
                     android:id="@+id/switch_show_face"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Show Face Points"
+                    android:text="@string/switch_show_face"
                     android:textColor="#FFFFFF"
                     android:textSize="14sp"
                     app:thumbTint="#FFFFFF"
@@ -319,7 +319,7 @@
                     android:id="@+id/label_tts_engine"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Engine"
+                    android:text="@string/label_engine"
                     android:textColor="#AAAAAA"
                     android:textSize="12sp"
                     android:visibility="gone"
@@ -335,7 +335,7 @@
                     android:id="@+id/input_server_ip"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="Server IP"
+                    android:hint="@string/hint_server_ip"
                     android:text="10.0.2.2"
                     android:textColor="#AAAAAA"
                     android:textColorHint="#555555"

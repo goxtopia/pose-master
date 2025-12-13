@@ -1,3 +1,33 @@
 <resources>
     <string name="app_name">Posture Monitor</string>
+    <string name="status_init">Status: Init</string>
+    <string name="status_running">Status: Running</string>
+    <string name="status_stopped">Status: Stopped</string>
+    <string name="sensor_idle">Sensor: Idle</string>
+    <string name="sensor_active">Active</string>
+    <string name="sensor_static">Static</string>
+    <string name="sensor_away">User Away (Paused)</string>
+    <string name="timer_joints">Joints: %.1fs</string>
+    <string name="timer_body">Body: %.1fs</string>
+    <string name="timer_gaze">Gaze: %.1fs</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop</string>
+    <string name="alert_prefix">⚠️ %s ALERT ⚠️</string>
+    <string name="alert_move">⚠️ MOVE! ⚠️</string>
+    <string name="config_title">CONFIGURATION</string>
+    <string name="label_joints_time">Joints (s)</string>
+    <string name="label_body_time">Body (s)</string>
+    <string name="label_gaze_time">Gaze (s)</string>
+    <string name="label_sensitivity">Sensitivity</string>
+    <string name="label_motion_sens">Motion Sens</string>
+    <string name="switch_local_tts">Local TTS</string>
+    <string name="switch_show_face">Show Face Points</string>
+    <string name="label_engine">Engine</string>
+    <string name="hint_server_ip">Server IP</string>
+
+    <!-- Alerts -->
+    <string name="msg_joints">You\'ve been in the same position for too long, move your joints.</string>
+    <string name="msg_body">You\'ve been sitting for too long, stand up and walk around.</string>
+    <string name="msg_gaze">Move your neck to protect your shoulders and neck.</string>
+    <string name="msg_relax">Please relax</string>
 </resources>

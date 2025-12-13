@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">姿态监测</string>
+    <string name="status_init">状态: 初始化</string>
+    <string name="status_running">状态: 运行中</string>
+    <string name="status_stopped">状态: 已停止</string>
+    <string name="sensor_idle">传感器: 空闲</string>
+    <string name="sensor_active">活跃</string>
+    <string name="sensor_static">静止</string>
+    <string name="sensor_away">用户离开 (暂停)</string>
+    <string name="timer_joints">关节: %.1fs</string>
+    <string name="timer_body">身体: %.1fs</string>
+    <string name="timer_gaze">视线: %.1fs</string>
+    <string name="btn_start">开始</string>
+    <string name="btn_stop">停止</string>
+    <string name="alert_prefix">⚠️ %s 警报 ⚠️</string>
+    <string name="alert_move">⚠️ 请活动! ⚠️</string>
+    <string name="config_title">配置</string>
+    <string name="label_joints_time">关节限时 (秒)</string>
+    <string name="label_body_time">身体限时 (秒)</string>
+    <string name="label_gaze_time">视线限时 (秒)</string>
+    <string name="label_sensitivity">灵敏度</string>
+    <string name="label_motion_sens">运动灵敏度</string>
+    <string name="switch_local_tts">本地语音 (TTS)</string>
+    <string name="switch_show_face">显示面部特征点</string>
+    <string name="label_engine">引擎</string>
+    <string name="hint_server_ip">服务器 IP</string>
+
+    <!-- Alerts -->
+    <string name="msg_joints">长时间保持一个姿势了，活动一下关节吧</string>
+    <string name="msg_body">坐太久了，起来走两步吧</string>
+    <string name="msg_gaze">动动脖子，保护肩颈</string>
+    <string name="msg_relax">请放松一下</string>
+</resources>
