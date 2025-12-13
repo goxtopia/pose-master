@@ -18,9 +18,9 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.Spinner
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.material.switchmaterial.SwitchMaterial
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -65,7 +65,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var seekMotionSensitivity: SeekBar
 
     // TTS UI
-    private lateinit var switchLocalTts: Switch
+    private lateinit var switchLocalTts: SwitchMaterial
     private lateinit var labelTtsEngine: TextView
     private lateinit var spinnerTtsEngine: Spinner
 
