@@ -19,6 +19,7 @@ import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import android.widget.Toast
 import com.google.android.material.switchmaterial.SwitchMaterial
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,6 +57,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var inputServerIp: EditText
     private lateinit var btnStart: Button
     private lateinit var btnSwitchCamera: ImageButton
+    private lateinit var btnHideUi: FloatingActionButton
+    private lateinit var btnRestoreUi: FloatingActionButton
 
     // Settings
     private lateinit var inputJoints: EditText
@@ -66,6 +69,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     // TTS UI
     private lateinit var switchLocalTts: SwitchMaterial
+    private lateinit var switchShowFace: SwitchMaterial
     private lateinit var labelTtsEngine: TextView
     private lateinit var spinnerTtsEngine: Spinner
 
@@ -115,6 +119,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         inputServerIp = findViewById(R.id.input_server_ip)
         btnStart = findViewById(R.id.btn_start)
         btnSwitchCamera = findViewById(R.id.btn_switch_camera)
+        btnHideUi = findViewById(R.id.btn_hide_ui)
+        btnRestoreUi = findViewById(R.id.btn_restore_ui)
 
         inputJoints = findViewById(R.id.input_joints)
         inputBody = findViewById(R.id.input_body)
@@ -123,6 +129,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         seekMotionSensitivity = findViewById(R.id.seek_motion_sensitivity)
 
         switchLocalTts = findViewById(R.id.switch_local_tts)
+        switchShowFace = findViewById(R.id.switch_show_face)
         labelTtsEngine = findViewById(R.id.label_tts_engine)
         spinnerTtsEngine = findViewById(R.id.spinner_tts_engine)
 
@@ -167,6 +174,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             startCamera()
         }
 
+        btnHideUi.setOnClickListener { setUiVisibility(false) }
+        btnRestoreUi.setOnClickListener { setUiVisibility(true) }
+
         // Auto-save listeners
         val saveListener = View.OnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) saveConfig()
@@ -188,6 +198,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         // TTS Listeners
         switchLocalTts.setOnCheckedChangeListener { _, isChecked ->
             updateTtsUiVisibility(isChecked)
+            saveConfig()
+        }
+
+        switchShowFace.setOnCheckedChangeListener { _, isChecked ->
+            overlay.showFacePoints = isChecked
             saveConfig()
         }
 
@@ -272,6 +287,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun setUiVisibility(visible: Boolean) {
+        val v = if (visible) View.VISIBLE else View.GONE
+        val restoreV = if (visible) View.GONE else View.VISIBLE
+
+        statusText.visibility = v
+        deltaText.visibility = v
+        timerJoints.visibility = v
+        timerBody.visibility = v
+        timerGaze.visibility = v
+        btnStart.visibility = v
+        btnSwitchCamera.visibility = v
+        btnHideUi.visibility = v
+        findViewById<View>(R.id.status_card).visibility = v // Status Card
+        findViewById<View>(R.id.settings_panel).visibility = v // Settings Panel
+
+        btnRestoreUi.visibility = restoreV
+    }
+
     private fun updateConfigFromUI() {
         try {
             val joints = inputJoints.text.toString().toLongOrNull() ?: 1500
@@ -331,6 +364,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                                     }
                                 }
 
+                                if (json.has("showFacePoints")) {
+                                    val showFace = json.getBoolean("showFacePoints")
+                                    switchShowFace.isChecked = showFace
+                                    overlay.showFacePoints = showFace
+                                }
+
                                 updateConfigFromUI()
                                 Log.d(TAG, "Config loaded")
                             }
@@ -359,6 +398,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             // Save TTS settings
             json.put("useLocalTts", switchLocalTts.isChecked)
             json.put("ttsEngine", selectedEnginePackage ?: "")
+            json.put("showFacePoints", switchShowFace.isChecked)
 
             val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
             val request = Request.Builder().url(url).post(body).build()
