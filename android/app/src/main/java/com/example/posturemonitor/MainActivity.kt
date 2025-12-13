@@ -639,16 +639,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         // Vibration Logic
         val ringerMode = audioManager.ringerMode
-        if (ringerMode == AudioManager.RINGER_MODE_SILENT || ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
+        val musicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+
+        // Vibrate if silent/vibrate mode OR if media volume is 0
+        if (ringerMode == AudioManager.RINGER_MODE_SILENT ||
+            ringerMode == AudioManager.RINGER_MODE_VIBRATE ||
+            musicVolume == 0) {
+
             if (vibrator.hasVibrator()) {
+                val pattern = longArrayOf(0, 400, 200, 400, 200, 400) // 3 pulses
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
+                    vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
                 } else {
                     @Suppress("DEPRECATION")
-                    vibrator.vibrate(500)
+                    vibrator.vibrate(pattern, -1)
                 }
             }
-            // If strictly silent, don't speak
+
+            // If strictly silent (and not just media volume 0 which might allow TTS on some channels but usually means user wants silence), don't speak
             if (ringerMode == AudioManager.RINGER_MODE_SILENT) {
                 return
             }
