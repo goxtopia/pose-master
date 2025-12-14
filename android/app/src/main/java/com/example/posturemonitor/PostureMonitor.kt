@@ -90,7 +90,7 @@ class PostureMonitor {
         val alertType: String?
     )
 
-    fun process(rawLandmarks: List<Point3D>?, motionDetected: Boolean, userPresent: Boolean): State {
+    fun process(rawLandmarks: List<Point3D>?, motionDetected: Boolean): State {
         val now = System.currentTimeMillis()
         var jointsMoved = false
         var gazeMoved = false
@@ -187,18 +187,6 @@ class PostureMonitor {
         if (tBody > limits.body) alertType = "body"
         else if (tJoints > limits.joints) alertType = "joints"
         else if (tGaze > limits.gaze) alertType = "gaze"
-
-        // If an alert is pending but user is NOT present (no landmarks detected),
-        // suppress the alert and reset the timer for that specific alert type
-        // effectively assuming the user left and came back or we just missed them.
-        if (alertType != null && !userPresent) {
-            when (alertType) {
-                "body" -> lastBodyMove = now
-                "joints" -> lastJointsMove = now
-                "gaze" -> lastGazeMove = now
-            }
-            alertType = null
-        }
 
         return State(
             mapOf("joints" to tJoints / 1000f, "body" to tBody / 1000f, "gaze" to tGaze / 1000f),

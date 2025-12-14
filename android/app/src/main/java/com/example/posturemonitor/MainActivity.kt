@@ -101,7 +101,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var isPipMode = false
     private var isUserAway = false
     private var lastPixelMotionTime = System.currentTimeMillis()
-    private val AWAY_TIMEOUT = 5 * 60 * 1000L
+    private val AWAY_TIMEOUT = 20 * 60 * 1000L
 
     // Alerting
     private val httpClient = OkHttpClient()
@@ -572,10 +572,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
             overlay.setLandmarks(rawList)
 
-            if (isVerificationCheck) {
-                Log.d(TAG, "User verified present (Static)")
-                lastPixelMotionTime = now
-            }
+            lastPixelMotionTime = now
 
             updateMonitorState(rawList, !isVerificationCheck)
         } else {
@@ -592,8 +589,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun updateMonitorState(landmarks: List<Point3D>?, physicalMotion: Boolean) {
         // User is present if landmarks is not null/empty
-        val userPresent = landmarks != null && landmarks.isNotEmpty()
-        val state = monitor.process(landmarks, physicalMotion, userPresent)
+        val state = monitor.process(landmarks, physicalMotion)
 
         timerJoints.text = getString(R.string.timer_joints, state.timers["joints"])
         timerBody.text = getString(R.string.timer_body, state.timers["body"])
