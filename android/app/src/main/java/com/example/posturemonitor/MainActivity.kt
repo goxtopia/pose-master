@@ -665,8 +665,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val motionBitmap = Bitmap.createScaledBitmap(bitmap, 64, 36, true)
         val hasMotion = motionDetector.checkMotion(motionBitmap)
 
-        val now = System.currentTimeMillis()
-
         runOnUiThread {
             if (isUserAway) {
                 deltaText.text = getString(R.string.sensor_away)
