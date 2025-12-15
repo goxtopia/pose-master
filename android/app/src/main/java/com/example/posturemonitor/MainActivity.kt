@@ -17,6 +17,8 @@ import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.TextToSpeech.EngineInfo
 import android.util.Log
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -29,6 +31,8 @@ import android.widget.TextView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import android.widget.Toast
 import com.google.android.material.switchmaterial.SwitchMaterial
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -61,11 +65,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var timerBody: TextView
     private lateinit var timerGaze: TextView
     private lateinit var alertOverlay: TextView
-    private lateinit var inputServerIp: EditText
     private lateinit var btnStart: Button
     private lateinit var btnSwitchCamera: ImageButton
     private lateinit var btnHideUi: FloatingActionButton
     private lateinit var btnRestoreUi: FloatingActionButton
+    private lateinit var btnAdvancedSettings: Button
 
     // Settings
     private lateinit var inputJoints: EditText
@@ -75,10 +79,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var seekMotionSensitivity: SeekBar
 
     // TTS UI
-    private lateinit var switchLocalTts: SwitchMaterial
     private lateinit var switchShowFace: SwitchMaterial
-    private lateinit var labelTtsEngine: TextView
-    private lateinit var spinnerTtsEngine: Spinner
+
+    // Advanced Settings State
+    private var useLocalTts = true
+    private var serverIp = "10.0.2.2"
 
     private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var imageAnalyzer: ImageAnalysis? = null
@@ -114,6 +119,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var selectedEnginePackage: String? = null
     private var isTtsReady = false
 
+    // Gesture Detector
+    private lateinit var gestureDetector: GestureDetector
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Keep screen on to prevent sleeping during monitoring
@@ -139,11 +147,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         timerBody = findViewById(R.id.timer_body)
         timerGaze = findViewById(R.id.timer_gaze)
         alertOverlay = findViewById(R.id.alert_overlay)
-        inputServerIp = findViewById(R.id.input_server_ip)
         btnStart = findViewById(R.id.btn_start)
         btnSwitchCamera = findViewById(R.id.btn_switch_camera)
         btnHideUi = findViewById(R.id.btn_hide_ui)
         btnRestoreUi = findViewById(R.id.btn_restore_ui)
+        btnAdvancedSettings = findViewById(R.id.btn_advanced_settings)
 
         inputJoints = findViewById(R.id.input_joints)
         inputBody = findViewById(R.id.input_body)
@@ -151,10 +159,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         seekSensitivity = findViewById(R.id.seek_sensitivity)
         seekMotionSensitivity = findViewById(R.id.seek_motion_sensitivity)
 
-        switchLocalTts = findViewById(R.id.switch_local_tts)
         switchShowFace = findViewById(R.id.switch_show_face)
-        labelTtsEngine = findViewById(R.id.label_tts_engine)
-        spinnerTtsEngine = findViewById(R.id.spinner_tts_engine)
 
         // Initialize defaults or load from prefs
         loadConfig()
@@ -170,23 +175,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         btnStart.setOnClickListener {
-            isRunning = !isRunning
-            if (isRunning) {
-                btnStart.text = getString(R.string.btn_stop)
-                btnStart.setBackgroundColor(Color.RED)
-                // Apply config
-                updateConfigFromUI()
-
-                monitor.reset()
-                lastPixelMotionTime = System.currentTimeMillis()
-                statusText.text = getString(R.string.status_running)
-            } else {
-                btnStart.text = getString(R.string.btn_start)
-                btnStart.setBackgroundColor(Color.LTGRAY)
-                statusText.text = getString(R.string.status_stopped)
-                alertOverlay.visibility = View.GONE
-                sendApiRequest("/api/stop", null)
-            }
+            toggleMonitoring()
         }
 
         btnSwitchCamera.setOnClickListener {
@@ -208,6 +197,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             updateUiVisibility()
         }
 
+        btnAdvancedSettings.setOnClickListener {
+            showAdvancedSettings()
+        }
+
         // Auto-save listeners
         val saveListener = View.OnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) saveConfig()
@@ -226,15 +219,102 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         seekSensitivity.setOnSeekBarChangeListener(seekListener)
         seekMotionSensitivity.setOnSeekBarChangeListener(seekListener)
 
-        // TTS Listeners
-        switchLocalTts.setOnCheckedChangeListener { _, isChecked ->
-            updateTtsUiVisibility(isChecked)
-            saveConfig()
-        }
-
         switchShowFace.setOnCheckedChangeListener { _, isChecked ->
             overlay.showFacePoints = isChecked
             saveConfig()
+        }
+
+        setupGestureDetector()
+    }
+
+    private fun setupGestureDetector() {
+        gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean {
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                toggleMonitoring()
+                return true
+            }
+        })
+
+        viewFinder.setOnTouchListener { _, event ->
+            gestureDetector.onTouchEvent(event)
+            true
+        }
+    }
+
+    private fun toggleMonitoring() {
+        isRunning = !isRunning
+        if (isRunning) {
+            btnStart.text = getString(R.string.btn_stop)
+            btnStart.setBackgroundColor(Color.RED)
+            // Apply config
+            updateConfigFromUI()
+
+            monitor.reset()
+            lastPixelMotionTime = System.currentTimeMillis()
+            statusText.text = getString(R.string.status_running)
+            Toast.makeText(this, "Monitoring Started", Toast.LENGTH_SHORT).show()
+        } else {
+            btnStart.text = getString(R.string.btn_start)
+            btnStart.setBackgroundColor(Color.LTGRAY)
+            statusText.text = getString(R.string.status_stopped)
+            alertOverlay.visibility = View.GONE
+            sendApiRequest("/api/stop", null)
+            Toast.makeText(this, "Monitoring Stopped", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showAdvancedSettings() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_advanced_settings, null)
+        val switchLocalTts = dialogView.findViewById<SwitchMaterial>(R.id.switch_local_tts)
+        val labelTtsEngine = dialogView.findViewById<TextView>(R.id.label_tts_engine)
+        val spinnerTtsEngine = dialogView.findViewById<Spinner>(R.id.spinner_tts_engine)
+        val inputServerIpField = dialogView.findViewById<TextInputEditText>(R.id.input_server_ip)
+
+        // Initialize values
+        switchLocalTts.isChecked = useLocalTts
+        inputServerIpField.setText(serverIp)
+
+        // Logic for TTS engine spinner
+        fun updateTtsUi(isLocal: Boolean) {
+            if (isLocal) {
+                labelTtsEngine.visibility = View.VISIBLE
+                spinnerTtsEngine.visibility = View.VISIBLE
+            } else {
+                labelTtsEngine.visibility = View.GONE
+                spinnerTtsEngine.visibility = View.GONE
+            }
+        }
+        updateTtsUi(useLocalTts)
+
+        // Populate Spinner
+        if (tts != null) {
+            try {
+                // Refresh engines list
+                availableEngines = tts!!.engines
+                val engineNames = availableEngines.map { "${it.label} (${it.name})" }
+                val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, engineNames)
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                spinnerTtsEngine.adapter = adapter
+
+                if (selectedEnginePackage == null) {
+                     selectedEnginePackage = tts!!.defaultEngine
+                }
+                val index = availableEngines.indexOfFirst { it.name == selectedEnginePackage }
+                if (index != -1) {
+                    spinnerTtsEngine.setSelection(index, false)
+                }
+            } catch (e: Exception) {
+                 Log.e(TAG, "Failed to get TTS engines: $e")
+            }
+        }
+
+        // Listeners
+        switchLocalTts.setOnCheckedChangeListener { _, isChecked ->
+            updateTtsUi(isChecked)
         }
 
         spinnerTtsEngine.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -251,6 +331,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
+
+        MaterialAlertDialogBuilder(this)
+            .setView(dialogView)
+            .setOnDismissListener {
+                // Save settings on dismiss
+                useLocalTts = switchLocalTts.isChecked
+                serverIp = inputServerIpField.text.toString()
+                saveConfig()
+            }
+            .show()
     }
 
     private fun initTts(packageName: String?) {
@@ -283,44 +373,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                  tts?.setLanguage(Locale.US)
             }
             isTtsReady = true
-            populateTtsEngines()
         } else {
             Log.e(TAG, "TTS Initialization failed")
-        }
-    }
-
-    private fun populateTtsEngines() {
-        if (tts == null) return
-        try {
-            availableEngines = tts!!.engines
-            val engineNames = availableEngines.map { "${it.label} (${it.name})" }
-
-            val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, engineNames)
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            spinnerTtsEngine.adapter = adapter
-
-            // Set selection if we have a current package
-            if (selectedEnginePackage == null) {
-                 selectedEnginePackage = tts!!.defaultEngine
-            }
-
-            val index = availableEngines.indexOfFirst { it.name == selectedEnginePackage }
-            if (index != -1) {
-                spinnerTtsEngine.setSelection(index, false)
-            }
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get TTS engines: $e")
-        }
-    }
-
-    private fun updateTtsUiVisibility(isLocal: Boolean) {
-        if (isLocal) {
-            labelTtsEngine.visibility = View.VISIBLE
-            spinnerTtsEngine.visibility = View.VISIBLE
-        } else {
-            labelTtsEngine.visibility = View.GONE
-            spinnerTtsEngine.visibility = View.GONE
         }
     }
 
@@ -392,17 +446,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         seekMotionSensitivity.progress = prefs.getInt("motionSensitivity", 60)
 
         // Default Local TTS to true
-        val useLocal = prefs.getBoolean("useLocalTts", true)
-        switchLocalTts.isChecked = useLocal
-        updateTtsUiVisibility(useLocal)
+        useLocalTts = prefs.getBoolean("useLocalTts", true)
+        serverIp = prefs.getString("serverIp", "10.0.2.2") ?: "10.0.2.2"
 
         selectedEnginePackage = prefs.getString("ttsEngine", null)
 
         val showFace = prefs.getBoolean("showFacePoints", false)
         switchShowFace.isChecked = showFace
         overlay.showFacePoints = showFace
-
-        inputServerIp.setText(prefs.getString("serverIp", "10.0.2.2"))
 
         updateConfigFromUI()
         Log.d(TAG, "Config loaded from prefs")
@@ -418,10 +469,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         editor.putInt("sensitivity", seekSensitivity.progress)
         editor.putInt("motionSensitivity", seekMotionSensitivity.progress)
 
-        editor.putBoolean("useLocalTts", switchLocalTts.isChecked)
+        editor.putBoolean("useLocalTts", useLocalTts)
         editor.putString("ttsEngine", selectedEnginePackage)
         editor.putBoolean("showFacePoints", switchShowFace.isChecked)
-        editor.putString("serverIp", inputServerIp.text.toString())
+        editor.putString("serverIp", serverIp)
 
         editor.apply()
         Log.d(TAG, "Config saved to prefs")
@@ -672,7 +723,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
 
-        if (switchLocalTts.isChecked) {
+        if (useLocalTts) {
             // Local TTS
             if (isTtsReady && tts != null) {
                 Log.d(TAG, "Local TTS speaking: $messageToSpeak")
@@ -682,7 +733,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         } else {
             // Server TTS
-            val ip = inputServerIp.text.toString()
+            val ip = serverIp
             if (ip.isEmpty()) return
 
             val endpoint = when(type) {
@@ -701,7 +752,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun sendApiRequest(endpoint: String, jsonBody: String?) {
-        val ip = inputServerIp.text.toString()
+        val ip = serverIp
         val url = "http://$ip:8080$endpoint"
 
         val requestBuilder = Request.Builder().url(url)

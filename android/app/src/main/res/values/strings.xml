@@ -15,6 +15,8 @@
     <string name="alert_prefix">⚠️ %s ALERT ⚠️</string>
     <string name="alert_move">⚠️ MOVE! ⚠️</string>
     <string name="config_title">CONFIGURATION</string>
+    <string name="settings_advanced_title">Advanced Settings</string>
+    <string name="btn_advanced">Advanced</string>
     <string name="label_joints_time">Joints (s)</string>
     <string name="label_body_time">Body (s)</string>
     <string name="label_gaze_time">Gaze (s)</string>
