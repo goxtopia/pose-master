@@ -305,14 +305,30 @@
                     app:thumbTint="#FFFFFF"
                     app:trackTint="#88FFFFFF"/>
 
-                <Button
-                    android:id="@+id/btn_advanced_settings"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/btn_advanced"
-                    android:textColor="#FFFFFF"
-                    android:backgroundTint="#555555"
-                    android:layout_marginTop="12dp"/>
+                    android:orientation="horizontal"
+                    android:layout_marginTop="12dp">
+                    <Button
+                        android:id="@+id/btn_advanced_settings"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/btn_advanced"
+                        android:textColor="#FFFFFF"
+                        android:backgroundTint="#555555"
+                        android:layout_marginEnd="8dp"/>
+                    <Button
+                        android:id="@+id/btn_statistics"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/btn_stats"
+                        android:textColor="#FFFFFF"
+                        android:backgroundTint="#555555"
+                        android:layout_marginStart="8dp"/>
+                </LinearLayout>
 
             </LinearLayout>
         </ScrollView>
