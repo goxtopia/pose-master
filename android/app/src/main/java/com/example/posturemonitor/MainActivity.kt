@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var btnHideUi: FloatingActionButton
     private lateinit var btnRestoreUi: FloatingActionButton
     private lateinit var btnAdvancedSettings: Button
+    private lateinit var btnStatistics: Button
 
     // Settings
     private lateinit var inputJoints: EditText
@@ -84,6 +85,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     // Advanced Settings State
     private var useLocalTts = true
     private var serverIp = "10.0.2.2"
+
+    // Statistics & Session Logic
+    private var sessionStartTime = 0L
+    private val SESSION_LIMIT_MS = 30 * 60 * 1000L // 30 minutes
+    private var lastStatsUpdate = 0L
+    // Shared state variables
+    @Volatile private var dailyAlerts = 0
+    @Volatile private var dailyMonitoringMs = 0L
+    @Volatile private var dailyBreakMs = 0L
+    @Volatile private var lastDayOfYear = -1
+    private val statsLock = Any()
 
     private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var imageAnalyzer: ImageAnalysis? = null
@@ -152,6 +164,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         btnHideUi = findViewById(R.id.btn_hide_ui)
         btnRestoreUi = findViewById(R.id.btn_restore_ui)
         btnAdvancedSettings = findViewById(R.id.btn_advanced_settings)
+        btnStatistics = findViewById(R.id.btn_statistics)
 
         inputJoints = findViewById(R.id.input_joints)
         inputBody = findViewById(R.id.input_body)
@@ -201,6 +214,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             showAdvancedSettings()
         }
 
+        btnStatistics.setOnClickListener {
+            showStatistics()
+        }
+
         // Auto-save listeners
         val saveListener = View.OnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) saveConfig()
@@ -246,24 +263,70 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun toggleMonitoring() {
+        val now = System.currentTimeMillis()
         isRunning = !isRunning
         if (isRunning) {
+            // Start Monitoring
             btnStart.text = getString(R.string.btn_stop)
             btnStart.setBackgroundColor(Color.RED)
             // Apply config
             updateConfigFromUI()
 
             monitor.reset()
-            lastPixelMotionTime = System.currentTimeMillis()
+            lastPixelMotionTime = now
+            sessionStartTime = now // Start/Resume session timer
+
+            // Break time logic: if we have a previous stop time, add to break time
+            synchronized(statsLock) {
+                if (lastStatsUpdate > 0) {
+                    val breakDuration = now - lastStatsUpdate
+                    // Basic sanity check: less than 24h
+                    if (breakDuration > 0 && breakDuration < 24 * 3600 * 1000) {
+                        dailyBreakMs += breakDuration
+                        saveStats()
+                    }
+                }
+            }
+            lastStatsUpdate = now
+
             statusText.text = getString(R.string.status_running)
             Toast.makeText(this, "Monitoring Started", Toast.LENGTH_SHORT).show()
         } else {
+            // Stop Monitoring
             btnStart.text = getString(R.string.btn_start)
             btnStart.setBackgroundColor(Color.LTGRAY)
             statusText.text = getString(R.string.status_stopped)
             alertOverlay.visibility = View.GONE
+
+            updateStats(true) // Commit monitoring time
+            lastStatsUpdate = now // Mark time stopped, for next break calculation
+
             sendApiRequest("/api/stop", null)
             Toast.makeText(this, "Monitoring Stopped", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateStats(isRunningState: Boolean) {
+        synchronized(statsLock) {
+            val now = System.currentTimeMillis()
+            val delta = now - lastStatsUpdate
+            if (delta > 0) {
+                if (isRunningState) {
+                    dailyMonitoringMs += delta
+                }
+            }
+            lastStatsUpdate = now
+
+            // Check Day Reset
+            val calendar = java.util.Calendar.getInstance()
+            val day = calendar.get(java.util.Calendar.DAY_OF_YEAR)
+            if (day != lastDayOfYear) {
+                dailyAlerts = 0
+                dailyMonitoringMs = 0
+                dailyBreakMs = 0
+                lastDayOfYear = day
+            }
+            saveStats()
         }
     }
 
@@ -455,8 +518,35 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         switchShowFace.isChecked = showFace
         overlay.showFacePoints = showFace
 
+        // Load Stats
+        lastDayOfYear = prefs.getInt("stats_day", -1)
+        val calendar = java.util.Calendar.getInstance()
+        val currentDay = calendar.get(java.util.Calendar.DAY_OF_YEAR)
+
+        if (lastDayOfYear != currentDay) {
+            // New day or first run
+            lastDayOfYear = currentDay
+            dailyAlerts = 0
+            dailyMonitoringMs = 0L
+            dailyBreakMs = 0L
+        } else {
+            dailyAlerts = prefs.getInt("stats_alerts", 0)
+            dailyMonitoringMs = prefs.getLong("stats_monitoring", 0L)
+            dailyBreakMs = prefs.getLong("stats_break", 0L)
+        }
+
         updateConfigFromUI()
         Log.d(TAG, "Config loaded from prefs")
+    }
+
+    private fun saveStats() {
+        val prefs = getSharedPreferences("PosturePrefs", MODE_PRIVATE)
+        val editor = prefs.edit()
+        editor.putInt("stats_day", lastDayOfYear)
+        editor.putInt("stats_alerts", dailyAlerts)
+        editor.putLong("stats_monitoring", dailyMonitoringMs)
+        editor.putLong("stats_break", dailyBreakMs)
+        editor.apply()
     }
 
     private fun saveConfig() {
@@ -537,6 +627,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (!isRunning) {
             imageProxy.close()
             return
+        }
+
+        // Update Monitoring Stats continuously
+        val now = System.currentTimeMillis()
+        if (now - lastStatsUpdate > 1000) { // Update every second
+             updateStats(true)
+
+             // Check Session Limit (30 mins)
+             if (now - sessionStartTime > SESSION_LIMIT_MS) {
+                 runOnUiThread {
+                     triggerAlert("walk")
+                 }
+                 sessionStartTime = now // Reset for next 30m
+             }
         }
 
         val rawBitmap = Bitmap.createBitmap(
@@ -687,10 +791,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun triggerAlert(type: String?) {
+        synchronized(statsLock) {
+            dailyAlerts++
+            saveStats()
+        }
+
         val messages = mapOf(
             "joints" to getString(R.string.msg_joints),
             "body" to getString(R.string.msg_body),
-            "gaze" to getString(R.string.msg_gaze)
+            "gaze" to getString(R.string.msg_gaze),
+            "walk" to getString(R.string.msg_walk)
         )
 
         val fallback = getString(R.string.msg_relax)
@@ -737,7 +847,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (ip.isEmpty()) return
 
             val endpoint = when(type) {
-                "joints", "gaze", "body" -> "/api/say"
+                "joints", "gaze", "body", "walk" -> "/api/say"
                 else -> "/api/relax"
             }
 
@@ -770,6 +880,30 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                  response.close()
             }
         })
+    }
+
+    private fun showStatistics() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_statistics, null)
+        val txtAlerts = dialogView.findViewById<TextView>(R.id.stat_alerts)
+        val txtMonitoring = dialogView.findViewById<TextView>(R.id.stat_monitoring)
+        val txtBreak = dialogView.findViewById<TextView>(R.id.stat_break)
+
+        // Format times
+        fun formatDuration(ms: Long): String {
+            val seconds = ms / 1000
+            val hours = seconds / 3600
+            val minutes = (seconds % 3600) / 60
+            return String.format("%dh %dm", hours, minutes)
+        }
+
+        txtAlerts.text = dailyAlerts.toString()
+        txtMonitoring.text = formatDuration(dailyMonitoringMs)
+        txtBreak.text = formatDuration(dailyBreakMs)
+
+        MaterialAlertDialogBuilder(this)
+            .setView(dialogView)
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     private val requestPermissions =

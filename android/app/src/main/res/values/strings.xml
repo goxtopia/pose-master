@@ -17,6 +17,7 @@
     <string name="config_title">CONFIGURATION</string>
     <string name="settings_advanced_title">Advanced Settings</string>
     <string name="btn_advanced">Advanced</string>
+    <string name="btn_stats">Statistics</string>
     <string name="label_joints_time">Joints (s)</string>
     <string name="label_body_time">Body (s)</string>
     <string name="label_gaze_time">Gaze (s)</string>
@@ -32,4 +33,10 @@
     <string name="msg_body">You\'ve been sitting for too long, stand up and walk around.</string>
     <string name="msg_gaze">Move your neck to protect your shoulders.</string>
     <string name="msg_relax">Please relax</string>
+    <string name="msg_walk">You have been active for 30 minutes, please stand up and walk around.</string>
+
+    <string name="stats_title">Daily Statistics</string>
+    <string name="stats_alerts_today">Alerts Today</string>
+    <string name="stats_monitoring_time">Monitoring Time</string>
+    <string name="stats_break_time">Break Time</string>
 </resources>
