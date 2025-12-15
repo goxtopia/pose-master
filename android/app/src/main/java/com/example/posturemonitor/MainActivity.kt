@@ -119,7 +119,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var isPipMode = false
     private var isUserAway = false
     private var lastPixelMotionTime = System.currentTimeMillis()
-    private val AWAY_TIMEOUT = 20 * 60 * 1000L
+    private val AWAY_TIMEOUT = 10 * 1000L
 
     // Alerting
     private val httpClient = OkHttpClient()
@@ -699,7 +699,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (isUserAway) {
                 Log.d(TAG, "User returned")
                 isUserAway = false
-                monitor.reset()
+                // No need to reset here
+                // monitor.reset()
             }
             detectPose(bitmap, now)
         } else {
@@ -749,7 +750,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
              if (isVerificationCheck) {
                  Log.d(TAG, "User not found -> AWAY")
                  isUserAway = true
-                 monitor.reset()
+                 // monitor.reset()
              } else {
                  updateMonitorState(null, true)
              }
