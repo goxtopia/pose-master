@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var timerBody: TextView
     private lateinit var timerGaze: TextView
     private lateinit var alertOverlay: TextView
+    private lateinit var pausedIndicator: View
     private lateinit var btnStart: Button
     private lateinit var btnSwitchCamera: ImageButton
     private lateinit var btnHideUi: FloatingActionButton
@@ -159,6 +160,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         timerBody = findViewById(R.id.timer_body)
         timerGaze = findViewById(R.id.timer_gaze)
         alertOverlay = findViewById(R.id.alert_overlay)
+        pausedIndicator = findViewById(R.id.paused_indicator)
         btnStart = findViewById(R.id.btn_start)
         btnSwitchCamera = findViewById(R.id.btn_switch_camera)
         btnHideUi = findViewById(R.id.btn_hide_ui)
@@ -242,6 +244,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         setupGestureDetector()
+
+        // Initial state
+        updatePausedIndicator()
     }
 
     private fun setupGestureDetector() {
@@ -303,6 +308,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
             sendApiRequest("/api/stop", null)
             Toast.makeText(this, "Monitoring Stopped", Toast.LENGTH_SHORT).show()
+        }
+        updatePausedIndicator()
+    }
+
+    private fun updatePausedIndicator() {
+        if (isRunning) {
+            pausedIndicator.visibility = View.GONE
+        } else {
+            // Show only if not in PiP
+            pausedIndicator.visibility = if (!isPipMode) View.VISIBLE else View.GONE
         }
     }
 
@@ -453,6 +468,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         isPipMode = isInPictureInPictureMode
         updateUiVisibility()
+        updatePausedIndicator()
     }
 
     private fun updateUiVisibility() {
