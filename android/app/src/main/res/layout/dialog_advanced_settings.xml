@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#222222">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_advanced_title"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"/>
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switch_local_tts"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/switch_local_tts"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        app:thumbTint="#FFFFFF"
+        app:trackTint="#88FFFFFF"/>
+
+    <TextView
+        android:id="@+id/label_tts_engine"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/label_engine"
+        android:textColor="#AAAAAA"
+        android:textSize="14sp"
+        android:visibility="gone"
+        android:layout_marginTop="8dp"/>
+    <Spinner
+        android:id="@+id/spinner_tts_engine"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="#FFFFFF"
+        android:visibility="gone"
+        android:minHeight="48dp"/>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="@string/hint_server_ip"
+        android:textColorHint="#AAAAAA"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/input_server_ip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="10.0.2.2"
+            android:textColor="#FFFFFF"
+            android:inputType="textUri"/>
+    </com.google.android.material.textfield.TextInputLayout>
+
+</LinearLayout>
