@@ -39,4 +39,6 @@
     <string name="stats_alerts_today">Alerts Today</string>
     <string name="stats_monitoring_time">Monitoring Time</string>
     <string name="stats_break_time">Break Time</string>
+    <string name="label_paused">PAUSED</string>
+    <string name="label_tap_to_resume">Double-tap to resume</string>
 </resources>
